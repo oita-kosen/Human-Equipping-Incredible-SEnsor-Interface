@@ -1,36 +1,16 @@
 #include <Arduino.h>
 #include <Wire.h>
 #include <WiFi.h>
+#include <WiFiClientSecure.h>
 
-// https://github.com/bolderflight/MPU9250
-#include <MPU9250.h>
+// https://github.com/Links2004/arduinoWebSockets
+#include <WebSocketsClient.h>
 
 // credentials.hは付属の`credentials_sample.h`に従って
 // 自分で用意してください。
 #include "credentials.h"
 
-#define MPU6050_ADDR         0x68 // MPU-6050 device address
-#define MPU6050_SMPLRT_DIV   0x19 // MPU-6050 register address
-#define MPU6050_CONFIG       0x1a
-#define MPU6050_GYRO_CONFIG  0x1b
-#define MPU6050_ACCEL_CONFIG 0x1c
-#define MPU6050_WHO_AM_I     0x75
-#define MPU6050_PWR_MGMT_1   0x6b
-
-MPU9250 IMU(Wire, MPU6050_ADDR);
-
-int autoCalibrateAccel()
-{
-  int status;
-  status = IMU.calibrateAccel();
-  if (status < 0)
-  {
-    Serial.printf("Accel Sensor Calibration Failed.");
-    return 0;
-  }
-  
-  return 1;
-}
+WebSocketsClient webSocket;
 
 /**
  * Connect WiFi
@@ -43,39 +23,71 @@ void connectWiFi()
         Serial.print(".");
         delay(100);
     }
+
     Serial.print(" connected. ");
     Serial.println(WiFi.localIP());
+}
+
+void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
+
+
+    switch(type) {
+        case WStype_DISCONNECTED:
+            Serial.printf("[WSc] Disconnected!\n");
+            break;
+        case WStype_CONNECTED:
+            {
+                Serial.printf("[WSc] Connected to url: %s\n",  payload);
+
+			          // send message to server when Connected
+				        webSocket.sendTXT("Connected");
+            }
+            break;
+        case WStype_TEXT:
+            Serial.printf("[WSc] get text: %s\n", payload);
+
+			    // send message to server
+			    // webSocket.sendTXT("message here");
+            break;
+        case WStype_BIN:
+            Serial.printf("[WSc] get binary length: %u\n", length);
+
+            // send data to server
+            // webSocket.sendBIN(payload, length);
+            break;
+		case WStype_ERROR:
+		case WStype_FRAGMENT_TEXT_START:
+		case WStype_FRAGMENT_BIN_START:
+		case WStype_FRAGMENT:
+		case WStype_FRAGMENT_FIN:
+			break;
+    }
+
 }
 
 void setup() {
   // put your setup code here, to run once:
   Serial.begin(9600);
   pinMode(23, OUTPUT);
-
-  IMU.begin();
-  IMU.setAccelRange(MPU9250::ACCEL_RANGE_8G);
-  IMU.setGyroRange(MPU9250::GYRO_RANGE_500DPS);
+  delay(500);
 
   connectWiFi();
+
+  webSocket.beginSSL("shielded-sea-64404.herokuapp.com", 81, "/echo");
+  webSocket.onEvent(webSocketEvent);
+
+  webSocket.setReconnectInterval(5000);
+  //connectWiFi();
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
-  float ax, ay, az, gx, gy, gz;
-  IMU.readSensor();
-  ax = IMU.getAccelX_mss();
-  ay = IMU.getAccelY_mss();
-  az = IMU.getAccelZ_mss();
-  gx = IMU.getGyroX_rads();
-  gy = IMU.getGyroY_rads();
-  gz = IMU.getGyroZ_rads();
+  static int count;
 
-  Serial.printf("%.2f %.2f %.2f\n", gx, gy, gz);
+  String str(count);
+  webSocket.sendTXT(str);
+  //Serial.println(str);
+  count++;
+  delay(1000);
 
-  // Reconnect
-  if ( WiFi.status() == W_DISCONNECTED ) {
-      connectWiFi();
-  }
-
-  delay(10);
+  webSocket.loop();
 }
