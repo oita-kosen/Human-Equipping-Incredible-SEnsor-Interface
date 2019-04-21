@@ -5,15 +5,23 @@
 #include <MPU9250.h>
 
 #define MPU6050_ADDR         0x68 // MPU-6050 device address
-#define MPU6050_SMPLRT_DIV   0x19 // MPU-6050 register address
-#define MPU6050_CONFIG       0x1a
-#define MPU6050_GYRO_CONFIG  0x1b
-#define MPU6050_ACCEL_CONFIG 0x1c
-#define MPU6050_WHO_AM_I     0x75
-#define MPU6050_PWR_MGMT_1   0x6b
 
 MPU9250 IMU(Wire, MPU6050_ADDR);
 
+// 振り向き検知の最低角速度[rad/s]
+const float lookback_speed_threshold = 5.0;
+
+// 振り向き検知の角度
+const float lookback_angle_threshold = PI/2.0;
+
+// 大きく振り返った時に2回以上検知されないようにするための
+// 振り向きの最低時間間隔[ms]
+const long lookback_min_interval_ms = 1000;
+
+/**
+ * 加速度センサーのキャリブレーションモード
+ * 現在不使用
+ */ 
 int autoCalibrateAccel()
 {
   int status;
@@ -25,6 +33,38 @@ int autoCalibrateAccel()
   }
   
   return 1;
+}
+
+/**
+ * ジャイロ値をもとに姿勢角の更新をする
+ * Z軸周り(ヨー方向,厳密には重力方向周り)の姿勢は
+ * カルマンフィルタを使うことはできないので
+ * ジャイロの積分をそのまま使用している。
+ */ 
+double updateAttitudeZ(float gz)
+{
+  static double angle_z=0;
+  static unsigned long t0 = millis();
+  unsigned long t = millis();
+
+  angle_z += gz * (t - t0)/1000;
+  t0 = t;
+  return angle_z;
+}
+
+double calculateAngleDiff(double angle1, double angle2)
+{
+  double diff = angle1 - angle2;
+  while(diff >= PI)
+  {
+    diff -= PI;
+  }
+  while(diff <= -PI)
+  {
+    diff += PI;
+  }
+
+  return diff;
 }
 
 void setup() {
@@ -40,6 +80,11 @@ void setup() {
 void loop() {
   // put your main code here, to run repeatedly:
   float ax, ay, az, gx, gy, gz;
+  double angle_z;
+  static double last_angle_z;
+  static bool isDetected;
+  static unsigned long t0 = 0;
+
   IMU.readSensor();
   ax = IMU.getAccelX_mss();
   ay = IMU.getAccelY_mss();
@@ -47,8 +92,36 @@ void loop() {
   gx = IMU.getGyroX_rads();
   gy = IMU.getGyroY_rads();
   gz = IMU.getGyroZ_rads();
-
+  /*
   Serial.printf("%.2f %.2f %.2f\n", gx, gy, gz);
+  */
+  angle_z = updateAttitudeZ(gz);
+
+  // 一定速度以下の振り向きは検知しないようにしている
+  if(gz <= lookback_speed_threshold &&
+     gz >= -lookback_speed_threshold)
+  {
+    last_angle_z = angle_z;
+  }
+
+  // 
+  double diff = calculateAngleDiff(angle_z, last_angle_z);
+
+  // 標準のabs関数だと関数マクロをしようしているからか
+  // 挙動がおかしいのでこうしている
+  double diff_abs = (diff >= 0 ? diff : -diff);
+
+  if(diff_abs >= lookback_angle_threshold)
+  {
+    // 大きく振り向いた時に2回以上検知されないようにしている
+    if (millis() - t0 > lookback_min_interval_ms)
+    {
+      // 振り向き検知
+      Serial.println("Detected!!");
+    }
+    last_angle_z = angle_z;
+    t0 = millis();
+  }
 
   delay(10);
 }
