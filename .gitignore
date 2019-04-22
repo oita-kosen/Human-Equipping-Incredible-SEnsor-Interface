@@ -28,3 +28,5 @@ _autosave-*
 .DS_Store
 .vscode
 .code-workspace
+
+credentials.h
