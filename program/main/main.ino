@@ -1,16 +1,17 @@
 #include <Arduino.h>
 #include <Wire.h>
 #include <WiFi.h>
+
+#include <PubSubClient.h>
 #include <WiFiClientSecure.h>
 
-// https://github.com/Links2004/arduinoWebSockets
-#include <WebSocketsClient.h>
 
 // credentials.hは付属の`credentials_sample.h`に従って
 // 自分で用意してください。
 #include "credentials.h"
 
-WebSocketsClient webSocket;
+WiFiClientSecure espClient;
+PubSubClient client(espClient);
 
 /**
  * Connect WiFi
@@ -28,41 +29,43 @@ void connectWiFi()
     Serial.println(WiFi.localIP());
 }
 
-void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
+void callback(char* topic, byte* payload, unsigned int length){
+  Serial.print("[");
+  Serial.print(topic);
+  Serial.print("] ");
+  char temp[64];
+  int lim = (length < 64 ? length : 63);
+  int i;
+  for (i = 0; i < lim; i++) {
+    temp[i] = (char)payload[i];
+    Serial.print((char)payload[i]);
+  }
+  temp[i] = '\0';
+}
 
+void reconnect() {
+  // Loop until we're reconnected
+  while (!client.connected()) {
+    Serial.println("==================");
+    Serial.print("Attempting MQTT connection...");
+    // Create a random client ID
+    String clientId = "ESP32Client-";
+    clientId += String(random(0xffff), HEX);
 
-    switch(type) {
-        case WStype_DISCONNECTED:
-            Serial.printf("[WSc] Disconnected!\n");
-            break;
-        case WStype_CONNECTED:
-            {
-                Serial.printf("[WSc] Connected to url: %s\n",  payload);
-
-			          // send message to server when Connected
-				        webSocket.sendTXT("Connected");
-            }
-            break;
-        case WStype_TEXT:
-            Serial.printf("[WSc] get text: %s\n", payload);
-
-			    // send message to server
-			    // webSocket.sendTXT("message here");
-            break;
-        case WStype_BIN:
-            Serial.printf("[WSc] get binary length: %u\n", length);
-
-            // send data to server
-            // webSocket.sendBIN(payload, length);
-            break;
-		case WStype_ERROR:
-		case WStype_FRAGMENT_TEXT_START:
-		case WStype_FRAGMENT_BIN_START:
-		case WStype_FRAGMENT:
-		case WStype_FRAGMENT_FIN:
-			break;
+    // Attempt to connect
+    if (client.connect(clientId.c_str(), mqtt_user, mqtt_password)) {
+      Serial.println("connected");
+      Serial.println("==================");
+      Serial.println("");
+      client.subscribe("stickir-ops");
+    } else {
+      Serial.print("failed, rc=");
+      Serial.print(client.state());
+      Serial.println(" try again in 5 seconds");
+      // Wait 5 seconds before retrying
+      delay(5000);
     }
-
+  }
 }
 
 void setup() {
@@ -71,23 +74,23 @@ void setup() {
   pinMode(23, OUTPUT);
   delay(500);
 
+  Serial.println("hello world!");
   connectWiFi();
+  
+  client.setServer(mqtt_server, mqtt_port);
+  client.setCallback(callback);
+  
+  Serial.println("client setup completed");
 
-  webSocket.beginSSL("shielded-sea-64404.herokuapp.com", 81, "/echo");
-  webSocket.onEvent(webSocketEvent);
-
-  webSocket.setReconnectInterval(5000);
-  //connectWiFi();
 }
 
 void loop() {
-  static int count;
+  client.publish("device/sensor", "hello from Device!");
 
-  String str(count);
-  webSocket.sendTXT(str);
-  //Serial.println(str);
-  count++;
+  if (!client.connected()) {
+    reconnect();
+  }
+  client.loop();
+
   delay(1000);
-
-  webSocket.loop();
 }
