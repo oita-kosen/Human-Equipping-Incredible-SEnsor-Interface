@@ -4,7 +4,11 @@
 // https://github.com/bolderflight/MPU9250
 #include <MPU9250.h>
 
-#define MPU6050_ADDR         0x68 // MPU-6050 device address
+#include <WiFi.h>
+
+#include "communication.h"
+
+#define MPU6050_ADDR 0x68 // MPU-6050 device address
 
 MPU9250 IMU(Wire, MPU6050_ADDR);
 
@@ -75,6 +79,13 @@ void setup() {
   IMU.begin();
   IMU.setAccelRange(MPU9250::ACCEL_RANGE_8G);
   IMU.setGyroRange(MPU9250::GYRO_RANGE_500DPS);
+
+  delay(500);
+
+  Serial.println("hello world!");
+  setupCommunication();
+  
+  Serial.println("client setup completed");
 }
 
 int LookBackDetection(float gz)
@@ -118,7 +129,7 @@ int LookBackDetection(float gz)
 
 void onLookBack()
 {
-  
+  sendMessage("MQTT");
 }
 
 void loop() {
@@ -137,5 +148,7 @@ void loop() {
     onLookBack();
   }
 
+  communication_loop();
+  
   delay(10);
 }
