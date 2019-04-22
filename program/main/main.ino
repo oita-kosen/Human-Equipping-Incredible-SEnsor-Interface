@@ -107,15 +107,16 @@ int LookBackDetection(float gz)
 
   // 標準のabs関数だと関数マクロをしようしているからか
   // 挙動がおかしいのでこうしている
-  double diff_abs = (diff >= 0 ? diff : -diff);
+  //double diff_abs = (diff >= 0 ? diff : -diff);
 
-  if(diff_abs >= lookback_angle_threshold)
+  //if(diff_abs >= lookback_angle_threshold)
+  if(diff >= lookback_angle_threshold)
   {
     // 大きく振り向いた時に2回以上検知されないようにしている
     if (millis() - t0 > lookback_min_interval_ms)
     {
       // 振り向き検知
-      Serial.println("Detected!!");
+      Serial.println("Right Turn Detected!!");
       last_angle_z = angle_z;
       t0 = millis();
       return 1;
@@ -124,28 +125,48 @@ int LookBackDetection(float gz)
     t0 = millis();
   }
 
+  if(diff <= -lookback_angle_threshold)
+  {
+    // 大きく振り向いた時に2回以上検知されないようにしている
+    if (millis() - t0 > lookback_min_interval_ms)
+    {
+      // 振り向き検知
+      Serial.println("Left Turn Detected!!");
+      last_angle_z = angle_z;
+      t0 = millis();
+      return -1;
+    }
+    last_angle_z = angle_z;
+    t0 = millis();
+  }
+
   return 0;
 }
 
-void onLookBack()
+void onLookBack(int direction)
 {
-  sendMessage("MQTT");
+  if(direction == 1)
+  {
+    sendMessage("right");
+  }
+  else if(direction == -1)
+  {
+    sendMessage("left");
+  }
 }
 
 void loop() {
   // put your main code here, to run repeatedly:
-  float ax, ay, az, gx, gy, gz;
-  double angle_z;
-  static double last_angle_z;
-  static bool isDetected;
-  static unsigned long t0 = 0;
+  float gz;
+  int direction = 0;
 
   IMU.readSensor();
   gz = IMU.getGyroZ_rads();
-
-  if(LookBackDetection(gz) != 0)
+  
+  direction = LookBackDetection(gz);
+  if(direction != 0)
   {
-    onLookBack();
+    onLookBack(direction);
   }
 
   communication_loop();
