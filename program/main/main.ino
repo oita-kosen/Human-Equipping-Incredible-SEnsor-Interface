@@ -77,24 +77,12 @@ void setup() {
   IMU.setGyroRange(MPU9250::GYRO_RANGE_500DPS);
 }
 
-void loop() {
-  // put your main code here, to run repeatedly:
-  float ax, ay, az, gx, gy, gz;
-  double angle_z;
-  static double last_angle_z;
-  static bool isDetected;
+int LookBackDetection(float gz)
+{
   static unsigned long t0 = 0;
+  static double last_angle_z;
+  double angle_z;
 
-  IMU.readSensor();
-  ax = IMU.getAccelX_mss();
-  ay = IMU.getAccelY_mss();
-  az = IMU.getAccelZ_mss();
-  gx = IMU.getGyroX_rads();
-  gy = IMU.getGyroY_rads();
-  gz = IMU.getGyroZ_rads();
-  /*
-  Serial.printf("%.2f %.2f %.2f\n", gx, gy, gz);
-  */
   angle_z = updateAttitudeZ(gz);
 
   // 一定速度以下の振り向きは検知しないようにしている
@@ -104,7 +92,6 @@ void loop() {
     last_angle_z = angle_z;
   }
 
-  // 
   double diff = calculateAngleDiff(angle_z, last_angle_z);
 
   // 標準のabs関数だと関数マクロをしようしているからか
@@ -118,9 +105,36 @@ void loop() {
     {
       // 振り向き検知
       Serial.println("Detected!!");
+      last_angle_z = angle_z;
+      t0 = millis();
+      return 1;
     }
     last_angle_z = angle_z;
     t0 = millis();
+  }
+
+  return 0;
+}
+
+void onLookBack()
+{
+  
+}
+
+void loop() {
+  // put your main code here, to run repeatedly:
+  float ax, ay, az, gx, gy, gz;
+  double angle_z;
+  static double last_angle_z;
+  static bool isDetected;
+  static unsigned long t0 = 0;
+
+  IMU.readSensor();
+  gz = IMU.getGyroZ_rads();
+
+  if(LookBackDetection(gz) != 0)
+  {
+    onLookBack();
   }
 
   delay(10);
