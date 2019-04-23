@@ -7,6 +7,7 @@
 #include <WiFi.h>
 
 #include "communication.h"
+#include "oled.h"
 
 #define MPU6050_ADDR 0x68 // MPU-6050 device address
 
@@ -86,6 +87,9 @@ void setup() {
   setupCommunication();
   
   Serial.println("client setup completed");
+
+  setupOLED();
+  Serial.println("OLED setup completed");
 }
 
 int LookBackDetection(float gz)
@@ -148,10 +152,12 @@ void onLookBack(int direction)
   if(direction == 1)
   {
     sendMessage("right");
+    clearDisplay();
   }
   else if(direction == -1)
   {
     sendMessage("left");
+    drawHeisei();
   }
 }
 
