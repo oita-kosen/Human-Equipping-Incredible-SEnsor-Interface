@@ -39,6 +39,7 @@ void callback(char* topic, byte* payload, unsigned int length){
     temp[i] = (char)payload[i];
     Serial.print((char)payload[i]);
   }
+  Serial.println("");
   temp[i] = '\0';
 }
 
