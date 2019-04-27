@@ -95,6 +95,8 @@ void setup() {
 
   setupOLED();
   Serial.println("OLED setup completed");
+
+  clearDisplay();
 }
 
 int getLookBackSpeedLevel(unsigned long t_delta)
@@ -204,6 +206,18 @@ void onLookBack(int direction)
   }
   */
 
+  
+  if(direction >= 1)
+  {
+    // 右振り向きの場合
+    message += "+";
+    drawHeisei();
+  }
+  else
+  {
+    // 左振り向きの場合
+    clearDisplay();
+  }
   message += direction;
   Serial.println(message);
   message.toCharArray(message_payload, 3);
