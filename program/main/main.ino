@@ -17,9 +17,9 @@ MPU9250 IMU(Wire, MPU6050_ADDR);
 const float lookback_speed_threshold = 3.0;
 
 // 振り向きにかかった時間に応じたレベル[ms]
-const unsigned long lookback_period_level1 = 300;
-const unsigned long lookback_period_level2 = 200;
-const unsigned long lookback_period_level3 = 150;
+const unsigned long lookback_period_level1 = 250;
+const unsigned long lookback_period_level2 = 0;
+const unsigned long lookback_period_level3 = 0;
 
 // 振り向き検知の角度
 const float lookback_angle_threshold = PI/2.0;
@@ -135,11 +135,6 @@ int LookBackDetection(float gz)
   }
 
   double diff = calculateAngleDiff(angle_z, last_angle_z);
-
-  // 標準のabs関数だと関数マクロをしようしているからか
-  // 挙動がおかしいのでこうしている
-  //double diff_abs = (diff >= 0 ? diff : -diff);
-
   
   if(diff >= lookback_angle_threshold)
   {
@@ -187,25 +182,6 @@ void onLookBack(int direction)
 {
   String message = "";
   char message_payload[10];
-  /*
-  if(direction >= 1)
-  {
-    message += "right";
-    message += direction;
-    message.toCharArray(message_payload, message.length());
-    sendMessage(message_payload);
-    clearDisplay();
-  }
-  else if(direction <= -1)
-  {
-    message += "left";
-    message += -direction;
-    message.toCharArray(message_payload, message.length());
-    sendMessage(message_payload);
-    drawHeisei();
-  }
-  */
-
   
   if(direction >= 1)
   {
@@ -231,7 +207,7 @@ void loop() {
   int direction = 0;
 
   IMU.readSensor();
-  gz = IMU.getGyroZ_rads();
+  gz = IMU.getGyroX_rads();
   
   direction = LookBackDetection(gz);
   if(direction != 0)
