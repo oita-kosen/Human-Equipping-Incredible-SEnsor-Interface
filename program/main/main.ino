@@ -14,15 +14,16 @@
 MPU9250 IMU(Wire, MPU6050_ADDR);
 
 // 振り向き検知の最低角速度[rad/s]
-const float lookback_speed_threshold = 3.0;
+const float lookback_speed_threshold = 1.0;
 
 // 振り向きにかかった時間に応じたレベル[ms]
-const unsigned long lookback_period_level1 = 250;
+const unsigned long lookback_period_level1 = 600;
 const unsigned long lookback_period_level2 = 0;
 const unsigned long lookback_period_level3 = 0;
 
-// 振り向き検知の角度
+// 振り向き検知の角
 const float lookback_angle_threshold = PI/2.0;
+const float lookback_angle_turn_threshold = PI*1.5;
 
 // 大きく振り返った時に2回以上検知されないようにするための
 // 振り向きの最低時間間隔[ms]
@@ -65,6 +66,7 @@ double updateAttitudeZ(float gz)
 double calculateAngleDiff(double angle1, double angle2)
 {
   double diff = angle1 - angle2;
+  /*
   while(diff >= PI)
   {
     diff -= PI;
@@ -73,6 +75,7 @@ double calculateAngleDiff(double angle1, double angle2)
   {
     diff += PI;
   }
+  */
 
   return diff;
 }
@@ -119,8 +122,7 @@ int getLookBackSpeedLevel(unsigned long t_delta)
 
 int LookBackDetection(float gz)
 {
-  static unsigned long t0 = 0;
-  static unsigned long t_laststop = 0;
+  static unsigned long t_laststop = millis();
   static double last_angle_z = 0;
   double angle_z;
 
@@ -130,50 +132,38 @@ int LookBackDetection(float gz)
   if(gz <= lookback_speed_threshold &&
      gz >= -lookback_speed_threshold)
   {
-    last_angle_z = angle_z;
-    t_laststop = millis();
-  }
+    double diff = calculateAngleDiff(angle_z, last_angle_z);
+    double diff_abs = (diff > 0 ) ? diff : -diff;
 
-  double diff = calculateAngleDiff(angle_z, last_angle_z);
-  
-  if(diff <= -lookback_angle_threshold)
-  {
-    unsigned long timedelta = millis() - t_laststop;
-    // 大きく振り向いた時に2回以上検知されないようにしている
-    if (millis() - t0 > lookback_min_interval_ms)
+    if(diff_abs >= lookback_angle_turn_threshold)
     {
-      
+      Serial.println("One rotation Turn Detected!!");
+      last_angle_z = angle_z;
+      return 100;
+    }
+  
+    if(diff <= -lookback_angle_threshold)
+    {
+      unsigned long timedelta = millis() - t_laststop;
       // 右振り向き検知
       Serial.println("Right Turn Detected!!");
       Serial.print("timedelta: "); Serial.println(timedelta);
       int speed_level = getLookBackSpeedLevel(timedelta);
       last_angle_z = angle_z;
-
-      t0 = millis();
-      
       return speed_level;
     }
-    last_angle_z = angle_z;
-    t0 = millis();
-    return 0;
-  }
-  else if(diff >= lookback_angle_threshold)
-  {
-    unsigned long timedelta = millis() - t_laststop;
-    // 大きく振り向いた時に2回以上検知されないようにしている
-    if (millis() - t0 > lookback_min_interval_ms)
+    else if(diff >= lookback_angle_threshold)
     {
+      unsigned long timedelta = millis() - t_laststop;
       // 左振り向き検知
       Serial.println("Left Turn Detected!!");
       Serial.print("timedelta: "); Serial.println(timedelta);
       int speed_level = getLookBackSpeedLevel(timedelta);
       last_angle_z = angle_z;
-      t0 = millis();
       return -speed_level;
     }
     last_angle_z = angle_z;
-    t0 = millis();
-    return 0;
+    t_laststop = millis();
   }
   return 0;
 }
@@ -182,21 +172,29 @@ void onLookBack(int direction)
 {
   String message = "";
   char message_payload[10];
+
+  if(direction == 100)
+  {
+    message += "turn";
+  }
+  else{
+    if(direction >= 1)
+    {
+      // 右振り向きの場合
+      message += "+";
+      message += direction;
+      drawHeisei();
+    }
+    else
+    {
+      // 左振り向きの場合
+      message += direction;
+      clearDisplay();
+    }
+  }
   
-  if(direction >= 1)
-  {
-    // 右振り向きの場合
-    message += "+";
-    drawHeisei();
-  }
-  else
-  {
-    // 左振り向きの場合
-    clearDisplay();
-  }
-  message += direction;
-  Serial.println(message);
-  message.toCharArray(message_payload, 3);
+  
+  message.toCharArray(message_payload, 10);
   Serial.println(message_payload);
   sendMessage(message_payload);
 }
