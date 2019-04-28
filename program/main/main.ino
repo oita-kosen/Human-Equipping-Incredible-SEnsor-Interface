@@ -136,7 +136,7 @@ int LookBackDetection(float gz)
 
   double diff = calculateAngleDiff(angle_z, last_angle_z);
   
-  if(diff >= lookback_angle_threshold)
+  if(diff <= -lookback_angle_threshold)
   {
     unsigned long timedelta = millis() - t_laststop;
     // 大きく振り向いた時に2回以上検知されないようにしている
@@ -157,7 +157,7 @@ int LookBackDetection(float gz)
     t0 = millis();
     return 0;
   }
-  else if(diff <= -lookback_angle_threshold)
+  else if(diff >= lookback_angle_threshold)
   {
     unsigned long timedelta = millis() - t_laststop;
     // 大きく振り向いた時に2回以上検知されないようにしている
