@@ -16,10 +16,10 @@ MPU9250 IMU(Wire, MPU6050_ADDR);
 // 振り向き検知の最低角速度[rad/s]
 const float lookback_speed_threshold = 1.0;
 
-// 振り向きにかかった時間に応じたレベル[ms]
-const unsigned long lookback_period_level1 = 600;
-const unsigned long lookback_period_level2 = 0;
-const unsigned long lookback_period_level3 = 0;
+// 振り向きの平均速度に応じたレベル[m/s]
+const float lookback_mean_speed_level1 = 4.00;
+const float lookback_mean_speed_level2 = 1000;
+const float lookback_mean_speed_level3 = 1000;
 
 // 振り向き検知の角
 const float lookback_angle_threshold = PI/2.0;
@@ -66,17 +66,6 @@ double updateAttitudeZ(float gz)
 double calculateAngleDiff(double angle1, double angle2)
 {
   double diff = angle1 - angle2;
-  /*
-  while(diff >= PI)
-  {
-    diff -= PI;
-  }
-  while(diff <= -PI)
-  {
-    diff += PI;
-  }
-  */
-
   return diff;
 }
 
@@ -102,22 +91,24 @@ void setup() {
   clearDisplay();
 }
 
-int getLookBackSpeedLevel(unsigned long t_delta)
+int getLookBackSpeedLevel(unsigned long t_delta, float angle)
 {
-  if(t_delta <= lookback_period_level3)
+  float mean_speed = angle / t_delta * 1000;
+
+  if(mean_speed < lookback_mean_speed_level1)
   {
-    return 4;
+    return 1;
   }
-  else if(t_delta <= lookback_period_level2)
-  {
-    return 3;
-  }
-  else if(t_delta <= lookback_period_level1)
+  else if(mean_speed < lookback_mean_speed_level2)
   {
     return 2;
   }
+  else if(mean_speed < lookback_mean_speed_level3)
+  {
+    return 3;
+  }
   
-  return 1;
+  return 4;
 }
 
 int LookBackDetection(float gz)
@@ -148,7 +139,8 @@ int LookBackDetection(float gz)
       // 右振り向き検知
       Serial.println("Right Turn Detected!!");
       Serial.print("timedelta: "); Serial.println(timedelta);
-      int speed_level = getLookBackSpeedLevel(timedelta);
+      Serial.print("mean speed: "); Serial.println(diff/timedelta * 1000);
+      int speed_level = getLookBackSpeedLevel(timedelta, diff_abs);
       last_angle_z = angle_z;
       return speed_level;
     }
@@ -158,7 +150,8 @@ int LookBackDetection(float gz)
       // 左振り向き検知
       Serial.println("Left Turn Detected!!");
       Serial.print("timedelta: "); Serial.println(timedelta);
-      int speed_level = getLookBackSpeedLevel(timedelta);
+      Serial.print("mean speed: "); Serial.println(diff/timedelta * 1000);
+      int speed_level = getLookBackSpeedLevel(timedelta, diff_abs);
       last_angle_z = angle_z;
       return -speed_level;
     }
