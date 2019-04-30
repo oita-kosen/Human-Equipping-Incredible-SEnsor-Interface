@@ -29,6 +29,9 @@ const float lookback_angle_turn_threshold = PI*1.5;
 // 振り向きの最低時間間隔[ms]
 const long lookback_min_interval_ms = 1000;
 
+long last_lookback_time = 0;
+bool is_clear_display = true;
+
 /**
  * 加速度センサーのキャリブレーションモード
  * 現在不使用
@@ -80,15 +83,15 @@ void setup() {
 
   delay(500);
 
+  setupOLED();
+  Serial.println("OLED setup completed");
+  drawHeisei();
+
   Serial.println("hello world!");
   setupCommunication();
   
   Serial.println("client setup completed");
 
-  setupOLED();
-  Serial.println("OLED setup completed");
-
-  clearDisplay();
 }
 
 int getLookBackSpeedLevel(unsigned long t_delta, float angle)
@@ -130,6 +133,9 @@ int LookBackDetection(float gz)
     {
       Serial.println("One rotation Turn Detected!!");
       last_angle_z = angle_z;
+
+      last_lookback_time = millis();
+      is_clear_display = false;
       return 100;
     }
   
@@ -142,6 +148,9 @@ int LookBackDetection(float gz)
       Serial.print("mean speed: "); Serial.println(diff/timedelta * 1000);
       int speed_level = getLookBackSpeedLevel(timedelta, diff_abs);
       last_angle_z = angle_z;
+
+      last_lookback_time = millis();
+      is_clear_display = false;
       return speed_level;
     }
     else if(diff >= lookback_angle_threshold)
@@ -153,6 +162,9 @@ int LookBackDetection(float gz)
       Serial.print("mean speed: "); Serial.println(diff/timedelta * 1000);
       int speed_level = getLookBackSpeedLevel(timedelta, diff_abs);
       last_angle_z = angle_z;
+
+      last_lookback_time = millis();
+      is_clear_display = false;
       return -speed_level;
     }
     last_angle_z = angle_z;
@@ -169,6 +181,7 @@ void onLookBack(int direction)
   if(direction == 100)
   {
     message += "turn";
+    drawReiWa();
   }
   else{
     if(direction >= 1)
@@ -176,13 +189,13 @@ void onLookBack(int direction)
       // 右振り向きの場合
       message += "+";
       message += direction;
-      drawHeisei();
+      drawMigi();
     }
     else
     {
       // 左振り向きの場合
       message += direction;
-      clearDisplay();
+      drawHidari();
     }
   }
   
@@ -208,6 +221,11 @@ void loop() {
     onLookBack(direction);
   }
 
+  if((millis() - last_lookback_time > 2000) && !is_clear_display)
+  {
+    drawHeisei();
+    is_clear_display = true;
+  }
   communication_loop();
   
   delay(10);
